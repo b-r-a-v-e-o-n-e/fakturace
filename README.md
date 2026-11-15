@@ -85,7 +85,7 @@ doklady vystavujte vždy jen v jednom zařízení, jinak se rozejdou číselné 
 - `src/lib.rs` – HTTP server (tiny_http), API, pravidla pro číselné řady, vstupní bod pro Android (JNI)
 - `src/main.rs` – spuštění z příkazové řádky v Linuxu
 - `android/` – projekt aplikace pro Android (Java, WebView)
-- `.github/workflows/build.yml` – sestavení APK a linuxového programu na GitHubu
+- `.github/workflows/build.yml` – sestavení APK a linuxového programu na GitHubu (jediný workflow; šablonu „Android CI“ od GitHubu nepoužívejte)
 - `tools/` – skripty pro import starých faktur z PDF
 - `src/model.rs` – datový model, výpočet DPH, kontroly náležitostí, QR Platba, IBAN
 - `src/pdf.rs` – generátor PDF (pdf-writer, vložené a subsetované fonty)
