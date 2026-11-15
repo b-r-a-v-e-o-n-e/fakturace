@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fakturace</title>
+<style>
+@font-face { font-family: "Lato"; src: url("/fonts/Lato-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Lato"; src: url("/fonts/Lato-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Lato"; src: url("/fonts/Lato-Light.ttf") format("truetype"); font-weight: 300; font-display: swap; }
+
+:root {
+  --bg: #eceff4; --surface: #ffffff; --sunken: #f4f6f9; --ink: #14181f; --muted: #5a6472; --line: #d5dae3;
+  --accent: #2b59d9; --accent-ink: #ffffff; --accent-soft: #e3eafc;
+  --ok: #17794a; --warn: #9a5b00; --warn-soft: #fff3d6; --bad: #b3261e; --bad-soft: #fde7e5;
+  --rail: #14181f; --rail-ink: #e9ecf2; --rail-muted: #8d97a8;
+  --shadow: 0 1px 2px rgba(20,24,31,.06), 0 8px 24px -12px rgba(20,24,31,.18);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #10141c; --surface: #19202c; --sunken: #141a24; --ink: #e8ebf1; --muted: #98a2b3; --line: #2c3545;
+  --accent: #8aa6ff; --accent-ink: #0d1322; --accent-soft: #212c48;
+  --ok: #5dd39e; --warn: #f2c063; --warn-soft: #3a2f14; --bad: #ff8a80; --bad-soft: #40201e;
+  --rail: #0b0e14; --rail-ink: #e8ebf1; --rail-muted: #7d8798;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font: 15px/1.45 "Lato", "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+h1 { font-size: 26px; font-weight: 300; margin: 0; letter-spacing: -.01em; }
+h2 { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+.app { display: grid; grid-template-columns: 212px 1fr; min-height: 100%; }
+
+/* postranní lišta */
+.rail { background: var(--rail); color: var(--rail-ink); padding: 22px 14px 16px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+.brand { font-weight: 700; font-size: 19px; padding: 0 10px 2px; letter-spacing: .01em; }
+.brand-sub { color: var(--rail-muted); font-size: 12.5px; padding: 0 10px 18px; }
+.rail a { color: var(--rail-ink); text-decoration: none; padding: 9px 10px; border-radius: 6px; display: block; }
+.rail a:hover { background: rgba(255,255,255,.07); }
+.rail a.on { background: #fff; color: #14181f; font-weight: 700; }
+.rail a.new { background: #3d6df2; color: #fff; font-weight: 700; margin: 4px 0 14px; text-align: center; }
+.rail a.new:hover { background: #5580f5; }
+.rail .spacer { flex: 1; }
+.rail .foot { color: var(--rail-muted); font-size: 12.5px; padding: 0 10px; }
+.rail button.theme { background: none; border: 1px solid rgba(255,255,255,.18); color: var(--rail-ink); border-radius: 6px; padding: 7px 10px; cursor: pointer; margin: 8px 0 10px; text-align: left; }
+.rail button.theme:hover { background: rgba(255,255,255,.07); }
+
+.main { padding: 28px 34px 60px; min-width: 0; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.head p { margin: 4px 0 0; color: var(--muted); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 14px; border-radius: 6px; cursor: pointer; text-decoration: none; color: var(--ink); display: inline-block; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.small { padding: 4px 9px; font-size: 13.5px; }
+.btn.ghost { background: none; border-color: transparent; color: var(--accent); padding-left: 6px; padding-right: 6px; }
+.btn.danger { color: var(--bad); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; box-shadow: var(--shadow); }
+.panel + .panel { margin-top: 16px; }
+.panel > p.hint, .hint { color: var(--muted); font-size: 13.5px; margin: -6px 0 14px; max-width: 70ch; }
+
+/* formuláře */
+.grid { display: grid; gap: 12px 14px; grid-template-columns: repeat(12, 1fr); }
+.f { grid-column: span 6; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.f.s2 { grid-column: span 2; } .f.s3 { grid-column: span 3; } .f.s4 { grid-column: span 4; } .f.s8 { grid-column: span 8; } .f.s12 { grid-column: span 12; }
+.f > span { font-size: 13px; color: var(--muted); }
+input[type=text], input[type=date], input[type=number], input[type=email], select, textarea {
+  background: var(--sunken); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; min-width: 0;
+}
+textarea { resize: vertical; min-height: 64px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; background: var(--surface); }
+.check { display: flex; gap: 8px; align-items: flex-start; grid-column: span 12; cursor: pointer; }
+.check input { margin-top: 4px; accent-color: var(--accent); }
+.check small { display: block; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--sunken); flex-wrap: wrap; }
+.seg button { border: 0; background: none; padding: 8px 14px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--ink); color: var(--surface); font-weight: 700; }
+
+/* kniha dokladů */
+.stats { display: flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 16px; box-shadow: var(--shadow); }
+.stats div { padding: 14px 22px; border-right: 1px solid var(--line); flex: 1 1 150px; }
+.stats div:last-child { border-right: 0; }
+.stats b { display: block; font-size: 22px; font-weight: 300; white-space: nowrap; }
+.stats span { color: var(--muted); font-size: 13px; }
+.stats .late b { color: var(--bad); }
+.filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+.filters select, .filters input { width: auto; background: var(--surface); }
+.filters input[type=text] { flex: 1 1 220px; max-width: 340px; }
+.tablewrap { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; box-shadow: var(--shadow); }
+table.ledger { width: 100%; border-collapse: collapse; }
+.ledger th { text-align: left; font-size: 12.5px; color: var(--muted); font-weight: 400; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.ledger td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.ledger tr:last-child td { border-bottom: 0; }
+.ledger tbody tr:hover { background: var(--sunken); }
+.ledger .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ledger .no { font-weight: 700; white-space: nowrap; }
+.ledger .no a { color: var(--ink); text-decoration: none; }
+.ledger .no a:hover { color: var(--accent); text-decoration: underline; }
+.ledger tr.void td { color: var(--muted); }
+.ledger tr.void .no a, .ledger tr.void .amount { text-decoration: line-through; color: var(--muted); }
+.ledger .rowact { white-space: nowrap; text-align: right; }
+.tag { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 6px; border-radius: 3px; margin-right: 8px; background: var(--accent-soft); color: var(--accent); min-width: 28px; text-align: center; }
+.tag.zalohova { background: var(--warn-soft); color: var(--warn); }
+.tag.paragon { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.tag.ddpp { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); }
+.state { white-space: nowrap; font-size: 13.5px; }
+.state::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: var(--muted); }
+.state.paid { color: var(--ok); } .state.paid::before { background: var(--ok); }
+.state.late { color: var(--bad); font-weight: 700; } .state.late::before { background: var(--bad); }
+.state.open::before { background: var(--warn); }
+.empty { padding: 44px 20px; text-align: center; color: var(--muted); }
+.empty b { display: block; color: var(--ink); font-size: 17px; margin-bottom: 6px; }
+
+details.more { display: inline-block; position: relative; }
+details.more summary { list-style: none; cursor: pointer; }
+details.more summary::-webkit-details-marker { display: none; }
+details.more .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); min-width: 230px; padding: 5px; text-align: left; }
+.menu button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.menu button:hover { background: var(--sunken); }
+.menu button.danger { color: var(--bad); }
+
+/* editor */
+.editor { display: grid; grid-template-columns: minmax(420px, 640px) minmax(360px, 1fr); gap: 20px; align-items: start; }
+.preview { position: sticky; top: 16px; }
+.preview iframe { width: 100%; height: calc(100vh - 150px); min-height: 520px; border: 1px solid var(--line); border-radius: 10px; background: #fff; display: block; }
+.pages { display: grid; gap: 10px; max-height: calc(100vh - 150px); overflow-y: auto; }
+.pages img, .tpl .shot img { width: 100%; display: block; background: #fff; }
+.pages img { border: 1px solid var(--line); border-radius: 6px; }
+.tpl .shot img { position: absolute; inset: 0; height: 100%; object-fit: cover; object-position: top; }
+.preview .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+table.items { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.items th { font-size: 12.5px; color: var(--muted); font-weight: 400; text-align: left; padding: 0 4px 5px; }
+.items td { padding: 3px 4px; vertical-align: top; }
+.items td:first-child, .items th:first-child { padding-left: 0; }
+.items .q { width: 68px; } .items .u { width: 62px; } .items .p { width: 108px; } .items .v { width: 80px; } .items .x { width: 30px; }
+.items input, .items select { padding: 7px 8px; }
+.items textarea { min-height: 37px; height: 37px; padding: 7px 8px; }
+.items .num input { text-align: right; }
+.items button.rm { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 18px; line-height: 1; padding: 8px 4px; }
+.items button.rm:hover { color: var(--bad); }
+.totals { margin: 18px 0 0 auto; max-width: 330px; }
+.totals div { display: flex; justify-content: space-between; padding: 3px 0; color: var(--muted); }
+.totals div b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
+.totals div.final { border-top: 2px solid var(--ink); margin-top: 6px; padding-top: 8px; color: var(--ink); font-weight: 700; align-items: baseline; }
+.totals div.final b { font-size: 24px; font-weight: 300; }
+.notice { border-radius: 8px; padding: 10px 14px; margin: 0 0 12px; font-size: 14px; }
+.notice.warn { background: var(--warn-soft); color: var(--warn); }
+.notice.bad { background: var(--bad-soft); color: var(--bad); }
+.notice.info { background: var(--accent-soft); color: var(--ink); }
+.notice ul { margin: 0; padding-left: 18px; }
+
+/* šablony */
+.tpls { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; }
+.tpl { background: var(--surface); border: 2px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; padding: 0; display: block; }
+.tpl.on { border-color: var(--accent); }
+.tpl .shot { aspect-ratio: 210/297; background: #fff; position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+.tpl .shot iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.tpl .cap { padding: 12px 14px 14px; }
+.tpl .cap b { display: block; margin-bottom: 3px; }
+.tpl .cap span { color: var(--muted); font-size: 13.5px; }
+.tpl.on .cap b::after { content: " – výchozí"; color: var(--accent); font-weight: 400; }
+.swatches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.swatches button { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.swatches button.on { box-shadow: 0 0 0 2px var(--ink); }
+.swatches input[type=color] { width: 40px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+
+.imgbox { display: flex; gap: 14px; align-items: center; }
+.imgbox > div:last-child { min-width: 0; }
+.imgbox .thumb { flex: none; }
+.imgbox .thumb { width: 190px; height: 70px; border: 1px dashed var(--line); border-radius: 8px; display: grid; place-items: center; background: #fff; color: #6b7480; font-size: 13px; overflow: hidden; }
+.imgbox img { max-width: 100%; max-height: 100%; }
+.series { display: grid; grid-template-columns: 1.3fr 1.2fr .7fr 1fr; gap: 8px 12px; align-items: center; }
+.series .h { font-size: 13px; color: var(--muted); }
+.series code { font: inherit; font-weight: 700; }
+
+.toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 8px; box-shadow: var(--shadow); z-index: 100; max-width: min(92vw, 640px); }
+.toast.bad { background: var(--bad); color: #fff; }
+:root[data-theme="dark"] .toast.bad { color: #1b0c0b; }
+
+@media (max-width: 1100px) { .editor { grid-template-columns: 1fr; } .preview { position: static; } .preview iframe { height: 80vh; } }
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 10px; }
+  .brand-sub, .rail .spacer, .rail .foot { display: none; }
+  .rail .new { margin: 0; } .rail button.theme { margin: 0 0 0 auto; }
+  .main { padding: 18px 14px 50px; }
+  .grid > .f { grid-column: span 12 !important; }
+  .items textarea { min-height: 58px; }
+  .series { grid-template-columns: 1fr 1fr; }
+  .head .actions { width: 100%; }
+  .panel { padding: 16px 14px; }
+  .items thead { display: none; }
+  .items tr { display: grid; grid-template-columns: 1fr 1fr 1.4fr 1fr 30px; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .items td { padding: 0; width: auto !important; }
+  .items td:first-child { grid-column: 1 / -1; }
+  .ledger th, .ledger td { padding: 9px 8px; }
+  .ledger .rowact .btn { margin-bottom: 4px; }
+  .pages { max-height: none; }
+  details.more .menu { right: 0; }
+}
+@media (prefers-reduced-motion: no-preference) { .btn, .rail a { transition: background .12s, border-color .12s, filter .12s; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Hlavní navigace">
+    <div class="brand">Fakturace</div>
+    <div class="brand-sub" id="brandSub"></div>
+    <a class="new" href="#/novy">Nový doklad</a>
+    <a href="#/doklady" data-nav="doklady">Kniha dokladů</a>
+    <a href="#/adresar" data-nav="adresar">Adresář</a>
+    <a href="#/sablony" data-nav="sablony">Šablony</a>
+    <a href="#/nastaveni" data-nav="nastaveni">Nastavení</a>
+    <div class="spacer"></div>
+    <button class="theme" id="themeBtn" type="button"></button>
+    <div class="foot" id="railFoot"></div>
+  </nav>
+  <main class="main" id="main"></main>
+</div>
+<script>
+"use strict";
+let S = null;            // stav ze serveru
+let draft = null;        // rozpracovaný doklad
+let F = { year: "", kind: "", state: "", q: "" };
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = h => new Intl.NumberFormat("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format((h || 0) / 100) + " Kč";
+const czDate = s => { if (!s) return ""; const [y, m, d] = s.split("-"); return `${+d}. ${+m}. ${y}`; };
+const parseNum = v => { const n = parseFloat(String(v).replace(/\s/g, "").replace(",", ".")); return isFinite(n) ? n : 0; };
+const fmtNum = n => String(n ?? "").replace(".", ",");
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const KIND = { faktura: ["FV", "Faktura"], zalohova: ["ZF", "Zálohová faktura"], paragon: ["PD", "Paragon"], ddpp: ["DD", "Daňový doklad k platbě"] };
+const PAY = { prevod: "Bankovním převodem", hotove: "Hotově", karta: "Platební kartou", dobirka: "Dobírkou", zapocet: "Zápočtem" };
+
+async function api(method, path, body) {
+  const r = await fetch(path, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok) {
+    let msg = "Server vrátil chybu " + r.status;
+    try { msg = (await r.json()).error || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return r;
+}
+const apiJson = async (m, p, b) => (await api(m, p, b)).json();
+const localToday = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+async function reload() { S = await apiJson("GET", "/api/state"); S.today = localToday(); chrome(); }
+
+// ---------- Android (aplikace ve WebView) ----------
+// WebView neumí zobrazit PDF ani stahovat soubory, proto se o obojí stará nativní část aplikace.
+const AND = window.Android || null;
+const blobB64 = blob => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1] || ""); r.onerror = no; r.readAsDataURL(blob); });
+async function pdfImages(blob) { return JSON.parse(AND.renderPdf(await blobB64(blob))); }
+if (AND) document.addEventListener("click", async e => {
+  const a = e.target.closest && e.target.closest('a[href^="/api/"]');
+  if (!a) return;
+  e.preventDefault();
+  try {
+    const r = await api("GET", a.getAttribute("href"));
+    const name = (/filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") || "") || [])[1] || "soubor";
+    const mime = (r.headers.get("Content-Type") || "application/octet-stream").split(";")[0];
+    const b64 = await blobB64(await r.blob());
+    const msg = mime === "application/pdf" ? AND.openFile(b64, name, mime) : AND.saveFile(b64, name, mime);
+    if (msg) toast(msg);
+  } catch (er) { fail(er); }
+});
+
+let toastTimer;
+function toast(msg, bad) {
+  $$(".toast").forEach(t => t.remove());
+  const t = document.createElement("div");
+  t.className = "toast" + (bad ? " bad" : "");
+  t.setAttribute("role", "status");
+  t.textContent = msg;
+  document.body.append(t);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.remove(), bad ? 7000 : 2600);
+}
+const fail = e => toast(e.message || String(e), true);
+
+// ---------- vzhled ----------
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $("#themeBtn").textContent = t === "dark" ? "Světlý režim" : "Tmavý režim";
+}
+function initTheme() {
+  let t = null;
+  const forced = new URLSearchParams(location.search).get("tema");
+  if (forced) t = forced === "tmava" ? "dark" : "light";
+  else try { t = localStorage.getItem("fakturace-theme"); } catch (e) {}
+  if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  applyTheme(t);
+  $("#themeBtn").onclick = () => {
+    const n = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    try { localStorage.setItem("fakturace-theme", n); } catch (e) {}
+    applyTheme(n);
+  };
+}
+function chrome() {
+  $("#brandSub").textContent = S.settings.company.name || "Firma zatím není vyplněna";
+  $("#railFoot").textContent = `Účetní rok ${S.settings.year} · verze ${S.version}`;
+}
+
+// ---------- směrování ----------
+function route() {
+  const [path, qs] = location.hash.replace(/^#\/?/, "").split("?");
+  const seg = path.split("/");
+  const q = new URLSearchParams(qs || "");
+  const page = seg[0] || "doklady";
+  $$(".rail a[data-nav]").forEach(a => a.classList.toggle("on", a.dataset.nav === page || (a.dataset.nav === "doklady" && page === "doklad")));
+  if (page === "novy") return viewEditor(null, q);
+  if (page === "doklad") return viewEditor(+seg[1], q);
+  if (page === "adresar") return viewContacts();
+  if (page === "sablony") return viewTemplates();
+  if (page === "nastaveni") return viewSettings();
+  return viewLedger();
+}
+
+// ---------- kniha dokladů ----------
+function invState(i) {
+  if (i.canceled) return ["void", "Stornováno"];
+  if (i.paid_date) return ["paid", "Uhrazeno " + czDate(i.paid_date)];
+  if (i.due_date && i.due_date < S.today) return ["late", "Po splatnosti"];
+  return ["open", "Neuhrazeno"];
+}
+function viewLedger() {
+  const years = [...new Set([S.settings.year, ...S.invoices.map(i => i.year)])].sort((a, b) => b - a);
+  if (F.year === "") F.year = String(S.settings.year);
+  const q = F.q.trim().toLowerCase();
+  const rows = S.invoices.filter(i =>
+    (F.year === "vse" || String(i.year) === F.year) && (!F.kind || i.kind === F.kind) &&
+    (!F.state || invState(i)[0] === F.state) &&
+    (!q || (i.number + " " + i.customer.name + " " + i.customer.ico + " " + i.items.map(x => x.desc).join(" ")).toLowerCase().includes(q))
+  ).sort((a, b) => (b.issue_date + String(b.id).padStart(9, "0")).localeCompare(a.issue_date + String(a.id).padStart(9, "0")));
+  const live = rows.filter(i => !i.canceled && i.kind !== "zalohova");
+  const sum = a => a.reduce((s, i) => s + i.totals.total, 0);
+  const open = rows.filter(i => invState(i)[0] === "open" || invState(i)[0] === "late");
+  const late = rows.filter(i => invState(i)[0] === "late");
+  const setup = !S.settings.company.name;
+
+  $("#main").innerHTML = `
+    <div class="head">
+      <div><h1>Kniha dokladů</h1><p>Vydané faktury, zálohové faktury a paragony.</p></div>
+      <div class="actions">
+        <a class="btn" href="/api/export/csv${F.year !== "vse" ? "?year=" + F.year : ""}">Stáhnout CSV</a>
+        <a class="btn primary" href="#/novy">Nový doklad</a>
+      </div>
+    </div>
+    ${setup ? `<div class="notice info">Než vystavíte první doklad, <a href="#/nastaveni">vyplňte údaje o své firmě</a> – název, sídlo, IČO, DIČ a číslo účtu.</div>` : ""}
+    <div class="stats">
+      <div><b>${live.length}</b><span>dokladů ve výběru</span></div>
+      <div><b>${money(sum(live))}</b><span>fakturováno celkem</span></div>
+      <div><b>${money(open.reduce((s, i) => s + i.totals.payable, 0))}</b><span>čeká na úhradu (${open.length})</span></div>
+      <div class="${late.length ? "late" : ""}"><b>${money(late.reduce((s, i) => s + i.totals.payable, 0))}</b><span>po splatnosti (${late.length})</span></div>
+    </div>
+    <div class="filters">
+      <select id="fYear" aria-label="Rok">${years.map(y => `<option value="${y}" ${String(y) === F.year ? "selected" : ""}>Rok ${y}</option>`).join("")}<option value="vse" ${F.year === "vse" ? "selected" : ""}>Všechny roky</option></select>
+      <select id="fKind" aria-label="Typ dokladu"><option value="">Všechny typy</option>${Object.entries(KIND).map(([k, v]) => `<option value="${k}" ${F.kind === k ? "selected" : ""}>${v[1]}</option>`).join("")}</select>
+      <select id="fState" aria-label="Stav"><option value="">Všechny stavy</option>${[["open", "Neuhrazeno"], ["late", "Po splatnosti"], ["paid", "Uhrazeno"], ["void", "Stornováno"]].map(([k, v]) => `<option value="${k}" ${F.state === k ? "selected" : ""}>${v}</option>`).join("")}</select>
+      <input type="text" id="fQ" placeholder="Hledat číslo, odběratele, položku" value="${esc(F.q)}" aria-label="Hledat">
+    </div>
+    <div class="tablewrap">
+      ${rows.length ? `<table class="ledger"><thead><tr>
+        <th>Číslo</th><th>Odběratel</th><th>Vystaveno</th><th>Splatnost</th><th class="num">Bez DPH</th><th class="num">Celkem</th><th>Stav</th><th></th>
+      </tr></thead><tbody>${rows.map(ledgerRow).join("")}</tbody></table>`
+      : `<div class="empty"><b>${S.invoices.length ? "Výběru neodpovídá žádný doklad" : "Zatím tu není žádný doklad"}</b>${S.invoices.length ? "Zkuste změnit rok nebo filtr." : `<a href="#/novy">Vystavte první fakturu</a> – číslo dostane ${esc(S.next_numbers.faktura)}.`}</div>`}
+    </div>`;
+  $("#fYear").onchange = e => { F.year = e.target.value; viewLedger(); };
+  $("#fKind").onchange = e => { F.kind = e.target.value; viewLedger(); };
+  $("#fState").onchange = e => { F.state = e.target.value; viewLedger(); };
+  $("#fQ").oninput = e => { F.q = e.target.value; clearTimeout(viewLedger.t); viewLedger.t = setTimeout(() => { viewLedger(); const i = $("#fQ"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 250); };
+  $$("[data-act]").forEach(b => b.onclick = () => rowAction(b.dataset.act, +b.dataset.id).catch(fail));
+}
+function ledgerRow(i) {
+  const [st, label] = invState(i);
+  const payer = i.supplier.vat_payer;
+  const menu = [];
+  if (!i.canceled) menu.push(i.paid_date ? ["unpaid", "Zrušit úhradu"] : ["paid", "Označit jako uhrazené dnes"]);
+  menu.push(["copy", "Vytvořit kopii"]);
+  if (i.kind === "zalohova" && !i.canceled) {
+    menu.push(["tofaktura", "Vystavit fakturu s odečtem zálohy"]);
+    if (payer) menu.push(["toddpp", "Vystavit daňový doklad k platbě"]);
+  }
+  menu.push(i.canceled ? ["unstorno", "Zrušit storno"] : ["storno", "Stornovat"]);
+  menu.push(["delete", "Smazat"]);
+  return `<tr class="${st === "void" ? "void" : ""}">
+    <td class="no"><span class="tag ${i.kind}" title="${esc(KIND[i.kind][1])}">${KIND[i.kind][0]}</span><a href="#/doklad/${i.id}">${esc(i.number)}</a></td>
+    <td>${esc(i.customer.name) || '<span style="color:var(--muted)">bez odběratele</span>'}</td>
+    <td>${czDate(i.issue_date)}</td>
+    <td>${i.kind === "paragon" || i.kind === "ddpp" ? "–" : czDate(i.due_date)}</td>
+    <td class="num">${money(i.totals.base)}</td>
+    <td class="num amount"><b>${money(i.totals.total)}</b></td>
+    <td><span class="state ${st}">${label}</span></td>
+    <td class="rowact">
+      <a class="btn small" href="/api/invoices/${i.id}/pdf" target="_blank" rel="noopener">PDF</a>
+      <a class="btn small" href="/api/invoices/${i.id}/isdoc">ISDOC</a>
+      <details class="more"><summary class="btn small" aria-label="Další akce pro doklad ${esc(i.number)}">Další</summary>
+        <div class="menu">${menu.map(([a, l]) => `<button type="button" class="${a === "delete" || a === "storno" ? "danger" : ""}" data-act="${a}" data-id="${i.id}">${l}</button>`).join("")}</div>
+      </details>
+    </td></tr>`;
+}
+async function rowAction(act, id) {
+  const inv = S.invoices.find(i => i.id === id);
+  if (act === "paid") await api("POST", `/api/invoices/${id}/paid`, { date: S.today });
+  else if (act === "unpaid") await api("POST", `/api/invoices/${id}/paid`, { date: "" });
+  else if (act === "storno") { if (!confirm(`Stornovat doklad ${inv.number}? Zůstane v knize označený jako stornovaný.`)) return; await api("POST", `/api/invoices/${id}/storno`, { canceled: true }); }
+  else if (act === "unstorno") await api("POST", `/api/invoices/${id}/storno`, { canceled: false });
+  else if (act === "delete") { if (!confirm(`Smazat doklad ${inv.number}? Tuto akci nelze vrátit.`)) return; await api("DELETE", `/api/invoices/${id}`); }
+  else if (act === "copy") { location.hash = `#/novy?kopie=${id}`; return; }
+  else if (act === "tofaktura") { location.hash = `#/novy?zaloha=${id}&typ=faktura`; return; }
+  else if (act === "toddpp") { location.hash = `#/novy?zaloha=${id}&typ=ddpp`; return; }
+  await reload();
+  viewLedger();
+  toast({ paid: "Označeno jako uhrazené", unpaid: "Úhrada zrušena", storno: "Doklad stornován", unstorno: "Storno zrušeno", delete: "Doklad smazán" }[act]);
+}
+
+// ---------- editor dokladu ----------
+function blankDraft(kind) {
+  const s = S.settings;
+  return {
+    id: 0, kind, issue_date: S.today, tax_date: S.today, due_date: addDays(S.today, kind === "paragon" ? 0 : s.due_days),
+    payment: kind === "paragon" ? "hotove" : s.default_payment, customer: { name: "", street: "", city: "", zip: "", country: "", ico: "", dic: "" },
+    items: [{ desc: "", qty: 1, unit: "ks", price: 0, vat: s.default_vat }], prices_incl_vat: kind === "paragon" && s.company.vat_payer, reverse_charge: false,
+    deposit: 0, deposit_ref: "", order_no: "", note: "", template: "", paid_date: "", vs: "", round_total: null,
+  };
+}
+function viewEditor(id, q) {
+  let title;
+  if (id) {
+    const inv = S.invoices.find(i => i.id === id);
+    if (!inv) { location.hash = "#/doklady"; return; }
+    draft = JSON.parse(JSON.stringify(inv));
+    delete draft.totals;
+    title = `${KIND[inv.kind][1]} ${inv.number}`;
+  } else {
+    const kind = KIND[q.get("typ")] ? q.get("typ") : "faktura";
+    draft = blankDraft(kind);
+    const src = S.invoices.find(i => i.id === +(q.get("kopie") || q.get("zaloha")));
+    if (src) {
+      draft.customer = { ...src.customer };
+      draft.items = src.items.map(x => ({ ...x }));
+      draft.prices_incl_vat = src.prices_incl_vat; draft.reverse_charge = src.reverse_charge;
+      draft.note = src.note; draft.order_no = src.order_no;
+      if (q.get("kopie")) { draft.kind = src.kind; draft.payment = src.payment; draft.due_date = addDays(S.today, src.kind === "paragon" ? 0 : S.settings.due_days); }
+      if (q.get("zaloha")) {
+        if (kind === "faktura") { draft.deposit = src.totals.payable / 100; draft.deposit_ref = src.number; }
+        if (kind === "ddpp") { draft.tax_date = src.paid_date || S.today; draft.paid_date = src.paid_date || S.today; draft.payment = src.payment; draft.note = `K zálohové faktuře ${src.number}.`; }
+      }
+    }
+    title = "Nový doklad";
+  }
+  renderEditor(title);
+}
+function renderEditor(title) {
+  const d = draft, isNew = !d.id;
+  const payer = (isNew ? S.settings.company : d.supplier).vat_payer;
+  const k = d.kind;
+  $("#main").innerHTML = `
+    <div class="head">
+      <div><h1>${esc(title)}</h1><p>${isNew ? `Doklad dostane číslo <b>${esc(S.next_numbers[k])}</b>.` : `Vystaveno ${czDate(d.issue_date)}${d.canceled ? " · stornováno" : ""}`}</p></div>
+      <div class="actions">
+        <a class="btn" href="#/doklady">Zpět do knihy</a>
+        ${isNew ? "" : `<a class="btn" href="/api/invoices/${d.id}/pdf?dl=1">Stáhnout PDF</a><a class="btn" href="/api/invoices/${d.id}/isdoc">Stáhnout ISDOC</a>`}
+        <button class="btn primary" id="save" type="button">${isNew ? "Vystavit doklad" : "Uložit změny"}</button>
+      </div>
+    </div>
+    <div class="editor">
+      <form id="form" autocomplete="off" onsubmit="return false">
+        <div id="msgs"></div>
+        <div class="panel">
+          ${isNew ? `<div class="seg" role="group" aria-label="Typ dokladu" style="margin-bottom:16px">${Object.entries(KIND).filter(([kk]) => kk !== "ddpp" || payer).map(([kk, v]) => `<button type="button" data-kind="${kk}" class="${kk === k ? "on" : ""}">${v[1]}</button>`).join("")}</div>` : ""}
+          <p class="hint" style="margin-top:0">${{
+            faktura: payer ? "Faktura – daňový doklad se všemi náležitostmi podle § 29 zákona o DPH." : "Faktura neplátce DPH – účetní doklad bez vyčíslení daně.",
+            zalohova: "Výzva k platbě předem. Není daňovým dokladem, DPH se z ní neodvádí." + (payer ? " Po úhradě vystavte daňový doklad k přijaté platbě." : ""),
+            paragon: payer ? "Zjednodušený daňový doklad za hotovost nebo kartu, nejvýše do 10 000 Kč včetně DPH. Odběratel je nepovinný." : "Doklad o zaplacení v hotovosti. Odběratel je nepovinný.",
+            ddpp: "Daňový doklad k přijaté záloze – vystavuje plátce DPH do 15 dnů od přijetí platby.",
+          }[k]}</p>
+          <div class="grid">
+            <label class="f s4"><span>Datum vystavení</span><input type="date" data-f="issue_date" value="${d.issue_date}"></label>
+            ${payer && k !== "zalohova" ? `<label class="f s4"><span>${k === "ddpp" ? "Datum přijetí platby" : "Datum uskutečnění plnění"}</span><input type="date" data-f="tax_date" value="${d.tax_date}"></label>` : ""}
+            ${k === "faktura" || k === "zalohova" ? `<label class="f s4"><span>Datum splatnosti</span><input type="date" data-f="due_date" value="${d.due_date}"></label>` : ""}
+            <label class="f s4"><span>Forma úhrady</span><select data-f="payment">${Object.entries(PAY).filter(([p]) => k !== "paragon" || p === "hotove" || p === "karta").map(([p, l]) => `<option value="${p}" ${d.payment === p ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+            ${k === "faktura" || k === "zalohova" ? `<label class="f s4"><span>Variabilní symbol</span><input type="text" data-f="vs" value="${esc(d.vs)}" placeholder="podle čísla dokladu" inputmode="numeric" maxlength="10"></label>` : ""}
+            <label class="f s4"><span>Číslo objednávky</span><input type="text" data-f="order_no" value="${esc(d.order_no)}"></label>
+            ${!isNew && k !== "paragon" ? `<label class="f s4"><span>Datum úhrady</span><input type="date" data-f="paid_date" value="${d.paid_date}"></label>` : ""}
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Odběratel${k === "paragon" ? " (nepovinný)" : ""}</h2>
+          <div class="grid">
+            <label class="f s12"><span>Vybrat z adresáře</span><select id="pick"><option value="">${S.contacts.length ? "– vyberte kontakt –" : "Adresář je zatím prázdný"}</option>${[...S.contacts].sort((a, b) => a.name.localeCompare(b.name, "cs")).map(c => `<option value="${c.id}">${esc(c.name)}${c.ico ? " · IČO " + esc(c.ico) : ""}</option>`).join("")}</select></label>
+            <label class="f s8"><span>Název nebo jméno</span><input type="text" data-c="name" value="${esc(d.customer.name)}"></label>
+            <label class="f s4"><span>IČO</span><input type="text" data-c="ico" value="${esc(d.customer.ico)}" inputmode="numeric"></label>
+            <label class="f s8"><span>Ulice a číslo</span><input type="text" data-c="street" value="${esc(d.customer.street)}"></label>
+            <label class="f s4"><span>DIČ</span><input type="text" data-c="dic" value="${esc(d.customer.dic)}"></label>
+            <label class="f s3"><span>PSČ</span><input type="text" data-c="zip" value="${esc(d.customer.zip)}"></label>
+            <label class="f s5" style="grid-column:span 5"><span>Město</span><input type="text" data-c="city" value="${esc(d.customer.city)}"></label>
+            <label class="f s4"><span>Stát (jen mimo ČR)</span><input type="text" data-c="country" value="${esc(d.customer.country)}"></label>
+            <label class="check" id="saveContactWrap"><input type="checkbox" id="saveContact"><span>Uložit odběratele do adresáře</span></label>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Položky</h2>
+          <table class="items"><thead><tr><th>Popis</th><th class="q">Počet</th><th class="u">Jedn.</th><th class="p">${d.prices_incl_vat && payer ? "Cena/ks s DPH" : "Cena/ks"}</th>${payer ? '<th class="v">DPH</th>' : ""}<th class="x"></th></tr></thead>
+          <tbody id="items"></tbody></table>
+          <button type="button" class="btn small" id="addItem">Přidat položku</button>
+          <div class="grid" style="margin-top:16px">
+            ${payer ? `<label class="check"><input type="checkbox" data-b="prices_incl_vat" ${d.prices_incl_vat ? "checked" : ""}><span>Ceny položek jsou včetně DPH</span></label>` : ""}
+            ${payer && k !== "paragon" ? `<label class="check"><input type="checkbox" data-b="reverse_charge" ${d.reverse_charge ? "checked" : ""}><span>Přenesená daňová povinnost<small>Daň odvede zákazník – např. stavební a montážní práce pro plátce DPH (§ 92e).</small></span></label>` : ""}
+            <label class="check"><input type="checkbox" id="roundTotal"><span>Zaokrouhlit částku k úhradě na celé koruny<small>Výchozí u plateb v hotovosti. Rozdíl se uvede jako zaokrouhlení mimo základ daně.</small></span></label>
+            ${k === "faktura" ? `<label class="f s4"><span>Odečíst uhrazenou zálohu (Kč)</span><input type="text" data-n="deposit" value="${d.deposit ? fmtNum(d.deposit) : ""}" inputmode="decimal"></label>
+            <label class="f s4"><span>Číslo zálohové faktury</span><input type="text" data-f="deposit_ref" value="${esc(d.deposit_ref)}"></label>` : ""}
+            <label class="f s12"><span>Poznámka na dokladu</span><textarea data-f="note">${esc(d.note)}</textarea></label>
+          </div>
+          <div class="totals" id="totals" aria-live="polite"></div>
+        </div>
+        ${!isNew ? `<div class="panel"><label class="check"><input type="checkbox" data-b="refresh_supplier"><span>Přepsat údaje dodavatele aktuálními z Nastavení<small>Doklad si jinak pamatuje údaje vaší firmy platné v den vystavení.</small></span></label></div>` : ""}
+      </form>
+      <div class="preview">
+        <div class="bar">
+          <div class="seg" role="group" aria-label="Šablona">${S.templates.map(t => `<button type="button" data-tpl="${t.id}" class="${(d.template || S.settings.template) === t.id ? "on" : ""}">${esc(t.name)}</button>`).join("")}</div>
+          <span class="hint" style="margin:0">Náhled PDF</span>
+        </div>
+        ${AND ? '<div id="pv" class="pages"></div>' : '<iframe id="pv" title="Náhled dokladu"></iframe>'}
+      </div>
+    </div>`;
+  renderItems();
+  const form = $("#form");
+  form.addEventListener("input", e => {
+    const t = e.target;
+    if (t.dataset.f) draft[t.dataset.f] = t.value;
+    else if (t.dataset.c) { draft.customer[t.dataset.c] = t.value; contactHint(); }
+    else if (t.dataset.n) draft[t.dataset.n] = parseNum(t.value);
+    else if (t.dataset.i !== undefined) {
+      const it = draft.items[+t.dataset.i], key = t.dataset.k;
+      it[key] = key === "desc" || key === "unit" ? t.value : parseNum(t.value);
+    } else return;
+    if (t.dataset.f === "issue_date" && isNew) {
+      draft.tax_date = t.value;
+      const tx = $('[data-f="tax_date"]'); if (tx) tx.value = t.value;
+      if (t.value) { draft.due_date = addDays(t.value, k === "paragon" ? 0 : S.settings.due_days); const du = $('[data-f="due_date"]'); if (du) du.value = draft.due_date; }
+    }
+    recalc();
+  });
+  const syncRound = () => { $("#roundTotal").checked = draft.round_total ?? (S.settings.round_cash && draft.payment === "hotove"); };
+  syncRound();
+  $("#roundTotal").onchange = e => { draft.round_total = e.target.checked; recalc(); };
+  form.addEventListener("change", e => {
+    const t = e.target;
+    if (t.dataset.f === "payment") syncRound();
+    if (t.dataset.b) {
+      draft[t.dataset.b] = t.checked;
+      if (t.dataset.b === "prices_incl_vat") { const th = $(".items th.p"); if (th) th.textContent = t.checked ? "Cena/ks s DPH" : "Cena/ks"; }
+      recalc();
+    }
+  });
+  $$("[data-kind]").forEach(b => b.onclick = () => {
+    const keep = draft; draft = blankDraft(b.dataset.kind);
+    Object.assign(draft, { customer: keep.customer, items: keep.items, note: keep.note, order_no: keep.order_no, issue_date: keep.issue_date, tax_date: keep.tax_date });
+    renderEditor(title);
+  });
+  $$("[data-tpl]").forEach(b => b.onclick = () => { draft.template = b.dataset.tpl; $$("[data-tpl]").forEach(x => x.classList.toggle("on", x === b)); preview(); });
+  $("#pick").onchange = e => {
+    const c = S.contacts.find(x => x.id === +e.target.value);
+    if (!c) return;
+    for (const key of ["name", "street", "city", "zip", "country", "ico", "dic"]) { draft.customer[key] = c[key] || ""; const i = $(`[data-c="${key}"]`); if (i) i.value = c[key] || ""; }
+    contactHint(); recalc();
+  };
+  $("#addItem").onclick = () => { draft.items.push({ desc: "", qty: 1, unit: "ks", price: 0, vat: S.settings.default_vat }); renderItems(); $$("#items textarea").pop().focus(); };
+  $("#save").onclick = () => save().catch(fail);
+  contactHint();
+  recalc();
+}
+function contactHint() {
+  const c = draft.customer;
+  const known = S.contacts.some(x => x.name.trim() === c.name.trim() && (x.ico || "") === (c.ico || ""));
+  $("#saveContactWrap").style.display = c.name.trim() && !known ? "" : "none";
+}
+function renderItems() {
+  const payer = (draft.id ? draft.supplier : S.settings.company).vat_payer;
+  const rates = [...new Set([21, 12, 0, S.settings.default_vat, ...draft.items.map(i => i.vat)])].sort((a, b) => b - a);
+  $("#items").innerHTML = draft.items.map((it, i) => `<tr>
+    <td><textarea data-i="${i}" data-k="desc" rows="1" aria-label="Popis položky ${i + 1}">${esc(it.desc)}</textarea></td>
+    <td class="q num"><input type="text" inputmode="decimal" data-i="${i}" data-k="qty" value="${fmtNum(it.qty)}" aria-label="Počet"></td>
+    <td class="u"><input type="text" data-i="${i}" data-k="unit" value="${esc(it.unit)}" aria-label="Jednotka"></td>
+    <td class="p num"><input type="text" inputmode="decimal" data-i="${i}" data-k="price" value="${it.price ? fmtNum(it.price) : ""}" placeholder="0,00" aria-label="Cena za jednotku"></td>
+    ${payer ? `<td class="v"><select data-i="${i}" data-k="vat" aria-label="Sazba DPH">${rates.map(r => `<option value="${r}" ${r === it.vat ? "selected" : ""}>${fmtNum(r)} %</option>`).join("")}</select></td>` : ""}
+    <td class="x">${draft.items.length > 1 ? `<button type="button" class="rm" data-rm="${i}" aria-label="Odebrat položku ${i + 1}">×</button>` : ""}</td></tr>`).join("");
+  $$("[data-rm]").forEach(b => b.onclick = () => { draft.items.splice(+b.dataset.rm, 1); renderItems(); recalc(); });
+  $$("#items textarea").forEach(t => { const fit = () => { t.style.height = "37px"; t.style.height = Math.max(37, t.scrollHeight + 2) + "px"; }; t.addEventListener("input", fit); fit(); });
+}
+let calcT, pvT, pvUrl, lastErrors = [];
+function recalc() {
+  clearTimeout(calcT);
+  calcT = setTimeout(async () => {
+    try {
+      const t = await apiJson("POST", "/api/calc", draft);
+      lastErrors = t.errors;
+      const rows = [];
+      if (t.vat && !draft.reverse_charge) t.rates.forEach(r => { rows.push([`Základ daně ${fmtNum(r.rate)} %`, r.base]); rows.push([`DPH ${fmtNum(r.rate)} %`, r.tax]); });
+      if (t.vat && draft.reverse_charge) rows.push(["Celkem bez DPH (daň odvede zákazník)", t.base]);
+      if (t.deposit || t.rounding) rows.push(["Celkem", t.total]);
+      if (t.deposit) rows.push(["Uhrazeno zálohou", -t.deposit]);
+      if (t.rounding) rows.push(["Zaokrouhlení", t.rounding]);
+      $("#totals").innerHTML = rows.map(([l, v]) => `<div><span>${l}</span><b>${money(v)}</b></div>`).join("") + `<div class="final"><span>K úhradě</span><b>${money(t.payable)}</b></div>`;
+      $("#msgs").innerHTML = (t.warnings.length ? `<div class="notice warn"><ul>${t.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : "");
+    } catch (e) { fail(e); }
+  }, 220);
+  clearTimeout(pvT);
+  pvT = setTimeout(preview, 650);
+}
+async function preview() {
+  try {
+    const r = await api("POST", "/api/preview?template=" + encodeURIComponent(draft.template || ""), draft);
+    const blob = await r.blob();
+    if (AND) {
+      const imgs = await pdfImages(blob), box = $("#pv");
+      if (box) box.innerHTML = imgs.map((u, i) => `<img src="${u}" alt="Náhled dokladu, strana ${i + 1}">`).join("");
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const f = $("#pv");
+    if (!f) return;
+    f.src = url + "#toolbar=0&navpanes=0&view=FitH";
+    if (pvUrl) URL.revokeObjectURL(pvUrl);
+    pvUrl = url;
+  } catch (e) { /* náhled není kritický */ }
+}
+async function save() {
+  const isNew = !draft.id;
+  const btn = $("#save");
+  btn.disabled = true;
+  try {
+    const wantContact = $("#saveContact").checked && $("#saveContactWrap").style.display !== "none";
+    const inv = await apiJson(isNew ? "POST" : "PUT", isNew ? "/api/invoices" : `/api/invoices/${draft.id}`, draft);
+    if (wantContact) await api("POST", "/api/contacts", { ...draft.customer });
+    await reload();
+    toast(isNew ? `Doklad ${inv.number} vystaven` : "Změny uloženy");
+    if (isNew) location.hash = `#/doklad/${inv.id}`; else viewEditor(inv.id, new URLSearchParams());
+  } catch (e) {
+    $("#msgs").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } finally { btn.disabled = false; }
+}
+
+// ---------- adresář ----------
+function viewContacts(editId) {
+  const list = [...S.contacts].sort((a, b) => a.name.localeCompare(b.name, "cs"));
+  const e = editId === 0 ? { id: 0 } : S.contacts.find(c => c.id === editId);
+  const fld = (k, l, cls = "s4", extra = "") => `<label class="f ${cls}"><span>${l}</span><input type="text" data-k="${k}" value="${esc(e?.[k] || "")}" ${extra}></label>`;
+  $("#main").innerHTML = `
+    <div class="head"><div><h1>Adresář</h1><p>Odběratelé, které vkládáte do dokladů.</p></div>
+      <div class="actions"><button class="btn primary" id="addC" type="button">Nový kontakt</button></div></div>
+    ${e ? `<form class="panel" id="cform" onsubmit="return false" style="margin-bottom:16px"><h2>${e.id ? "Upravit kontakt" : "Nový kontakt"}</h2><div class="grid">
+      ${fld("name", "Název nebo jméno", "s8")}${fld("ico", "IČO", "s4", 'inputmode="numeric"')}
+      ${fld("street", "Ulice a číslo", "s8")}${fld("dic", "DIČ")}
+      ${fld("zip", "PSČ", "s3")}<label class="f" style="grid-column:span 5"><span>Město</span><input type="text" data-k="city" value="${esc(e.city || "")}"></label>${fld("country", "Stát (jen mimo ČR)")}
+      ${fld("email", "E-mail")}${fld("phone", "Telefon")}${fld("note", "Poznámka")}
+      </div><div class="actions" style="margin-top:16px"><button class="btn primary" id="saveC" type="button">Uložit kontakt</button><button class="btn" id="cancelC" type="button">Zrušit</button></div></form>` : ""}
+    <div class="tablewrap">${list.length ? `<table class="ledger"><thead><tr><th>Název</th><th>Adresa</th><th>IČO</th><th>DIČ</th><th>Kontakt</th><th></th></tr></thead><tbody>
+      ${list.map(c => `<tr><td class="no">${esc(c.name)}</td><td>${esc([c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean).join(", "))}</td><td>${esc(c.ico)}</td><td>${esc(c.dic)}</td><td>${esc([c.email, c.phone].filter(Boolean).join(", "))}</td>
+      <td class="rowact"><a class="btn small" href="#/novy" data-inv="${c.id}">Vystavit doklad</a> <button class="btn small" data-edit="${c.id}" type="button">Upravit</button> <button class="btn small danger" data-del="${c.id}" type="button">Smazat</button></td></tr>`).join("")}
+      </tbody></table>` : `<div class="empty"><b>Adresář je prázdný</b>Přidejte první kontakt, nebo ho uložte přímo při vystavení dokladu.</div>`}</div>`;
+  $("#addC").onclick = () => viewContacts(0);
+  $$("[data-edit]").forEach(b => b.onclick = () => { viewContacts(+b.dataset.edit); window.scrollTo(0, 0); });
+  $$("[data-del]").forEach(b => b.onclick = async () => {
+    const c = S.contacts.find(x => x.id === +b.dataset.del);
+    if (!confirm(`Smazat kontakt ${c.name}? Vystavené doklady zůstanou beze změny.`)) return;
+    try { await api("DELETE", `/api/contacts/${c.id}`); await reload(); viewContacts(); toast("Kontakt smazán"); } catch (er) { fail(er); }
+  });
+  $$("[data-inv]").forEach(a => a.onclick = ev => { ev.preventDefault(); location.hash = "#/novy"; setTimeout(() => { const p = $("#pick"); if (p) { p.value = a.dataset.inv; p.dispatchEvent(new Event("change")); } }, 30); });
+  if (e) {
+    $("#cancelC").onclick = () => viewContacts();
+    $("#saveC").onclick = async () => {
+      const c = { id: e.id }; $$("#cform [data-k]").forEach(i => c[i.dataset.k] = i.value.trim());
+      try { await api(e.id ? "PUT" : "POST", e.id ? `/api/contacts/${e.id}` : "/api/contacts", c); await reload(); viewContacts(); toast("Kontakt uložen"); } catch (er) { fail(er); }
+    };
+    $('#cform [data-k="name"]').focus();
+  }
+}
+
+// ---------- šablony ----------
+function viewTemplates() {
+  const s = S.settings;
+  const presets = ["#3d6df2", "#0f766e", "#b4232a", "#7c3aed", "#c2410c", "#1f2937"];
+  const acc = s.accent.replace("#", "");
+  $("#main").innerHTML = `
+    <div class="head"><div><h1>Šablony dokladů</h1><p>Výchozí vzhled PDF. U každého dokladu můžete šablonu změnit v náhledu.</p></div></div>
+    <div class="panel" style="margin-bottom:18px"><h2>Barva firmy</h2>
+      <div class="swatches">${presets.map(p => `<button type="button" data-acc="${p}" class="${p === s.accent ? "on" : ""}" style="background:${p}" aria-label="Barva ${p}"></button>`).join("")}
+      <input type="color" id="accPick" value="${esc(s.accent)}" aria-label="Vlastní barva"><span class="hint" style="margin:0">Linka, zvýraznění a barevné plochy v šablonách.</span></div>
+    </div>
+    <div class="tpls">${S.templates.map(t => `<button type="button" class="tpl ${t.id === s.template ? "on" : ""}" data-set="${t.id}">
+      <div class="shot" data-shot="${t.id}">${AND ? "" : `<iframe src="/api/sample?template=${t.id}&accent=${acc}#toolbar=0&navpanes=0&scrollbar=0&view=Fit" title="Ukázka šablony ${esc(t.name)}" tabindex="-1" loading="lazy"></iframe>`}</div>
+      <div class="cap"><b>${esc(t.name)}</b><span>${esc(t.desc)}</span></div></button>`).join("")}</div>
+    <p class="hint" style="margin-top:16px">Ukázky používají vaše firemní údaje, logo a razítko z Nastavení. <a href="/api/sample?template=${s.template}" target="_blank" rel="noopener">Otevřít ukázku v plné velikosti</a></p>`;
+  if (AND) $$("[data-shot]").forEach(async box => {
+    try {
+      const r = await api("GET", `/api/sample?template=${box.dataset.shot}&accent=${acc}`);
+      const imgs = await pdfImages(await r.blob());
+      box.innerHTML = `<img src="${imgs[0]}" alt="Ukázka šablony">`;
+    } catch (e) {}
+  });
+  const put = async patch => { try { await api("PUT", "/api/settings", { ...S.settings, ...patch }); await reload(); viewTemplates(); toast("Uloženo"); } catch (e) { fail(e); } };
+  $$("[data-set]").forEach(b => b.onclick = () => put({ template: b.dataset.set }));
+  $$("[data-acc]").forEach(b => b.onclick = () => put({ accent: b.dataset.acc }));
+  $("#accPick").onchange = e => put({ accent: e.target.value });
+}
+
+// ---------- nastavení ----------
+function viewSettings() {
+  const s = JSON.parse(JSON.stringify(S.settings)), c = s.company;
+  const fld = (k, l, cls = "s4", ph = "") => `<label class="f ${cls}"><span>${l}</span><input type="text" data-co="${k}" value="${esc(c[k] || "")}" placeholder="${esc(ph)}"></label>`;
+  const img = (k, l, hint) => `<div class="f s6"><span>${l}</span><div class="imgbox"><div class="thumb">${s[k] ? `<img src="${s[k]}" alt="">` : "žádný obrázek"}</div>
+    <div><label class="btn small">Nahrát PNG nebo JPEG<input type="file" accept="image/png,image/jpeg" data-img="${k}" hidden></label> ${s[k] ? `<button type="button" class="btn small danger" data-rmimg="${k}">Odebrat</button>` : ""}<div class="hint" style="margin:6px 0 0">${hint}</div></div></div></div>`;
+  $("#main").innerHTML = `
+    <div class="head"><div><h1>Nastavení</h1><p>Údaje vaší firmy se propíší do každého nově vystaveného dokladu.</p></div>
+      <div class="actions"><button class="btn primary" id="saveS" type="button">Uložit nastavení</button></div></div>
+    <div class="panel"><h2>Firma</h2><div class="grid">
+      ${fld("name", "Název firmy nebo jméno a příjmení", "s8")}${fld("ico", "IČO")}
+      ${fld("street", "Ulice a číslo", "s8")}${fld("dic", "DIČ", "s4", "CZ12345678")}
+      ${fld("zip", "PSČ", "s3")}<label class="f" style="grid-column:span 5"><span>Město</span><input type="text" data-co="city" value="${esc(c.city)}"></label>${fld("country", "Stát")}
+      <label class="check"><input type="checkbox" id="vatPayer" ${c.vat_payer ? "checked" : ""}><span>Jsem plátce DPH<small>Plátce vystavuje daňové doklady s rozpisem DPH. Neplátce má na dokladu „Nejsem plátce DPH“ a žádnou daň.</small></span></label>
+      ${fld("register", "Zápis v rejstříku (povinný údaj na dokladech)", "s12", "Společnost je zapsána v obchodním rejstříku vedeném Městským soudem v Praze, oddíl C, vložka …")}
+      ${fld("phone", "Telefon")}${fld("email", "E-mail")}${fld("web", "Web")}
+      ${fld("issued_by", "Doklady vystavuje", "s4", "jméno a příjmení")}
+    </div></div>
+    <div class="panel"><h2>Bankovní účet</h2><p class="hint">Z českého čísla účtu se IBAN dopočítá sám. IBAN je potřeba pro QR Platbu a export ISDOC.</p><div class="grid">
+      ${fld("bank_account", "Číslo účtu", "s4", "123456789/0100")}${fld("iban", "IBAN", "s4", "dopočítá se")}${fld("swift", "BIC / SWIFT", "s2")}${fld("bank_name", "Banka", "s2")}
+    </div></div>
+    <div class="panel"><h2>Logo a razítko</h2><div class="grid">
+      ${img("logo", "Logo", "Zobrazí se v záhlaví dokladu. Nejlépe PNG s průhledným pozadím.")}
+      ${img("stamp", "Razítko a podpis", "Vloží se do pole pro podpis.")}
+    </div></div>
+    <div class="panel"><h2>Výchozí hodnoty dokladů</h2><div class="grid">
+      <label class="f s3"><span>Splatnost (dnů)</span><input type="number" min="0" max="365" id="dueDays" value="${s.due_days}"></label>
+      <label class="f s3"><span>Výchozí sazba DPH (%)</span><select id="defVat">${[21, 12, 0].map(r => `<option ${r === s.default_vat ? "selected" : ""}>${r}</option>`).join("")}</select></label>
+      <label class="f s4"><span>Výchozí forma úhrady</span><select id="defPay">${Object.entries(PAY).map(([p, l]) => `<option value="${p}" ${s.default_payment === p ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label class="check"><input type="checkbox" id="roundCash" ${s.round_cash ? "checked" : ""}><span>Hotovostní platby zaokrouhlovat na celé koruny<small>Zaokrouhlovací rozdíl se nezapočítává do základu daně.</small></span></label>
+      <label class="check"><input type="checkbox" id="showQr" ${s.show_qr ? "checked" : ""}><span>Tisknout QR Platbu na doklady placené převodem</span></label>
+      <label class="f s12"><span>Text v patičce dokladů</span><input type="text" id="footNote" value="${esc(s.footer_note)}"></label>
+    </div></div>
+    <div class="panel"><h2>Číselné řady a účetní rok</h2>
+      <p class="hint">Aktivní rok je <b>${s.year}</b>. V masce použijte {RRRR} nebo {RR} pro rok a {NNNN} pro pořadové číslo – počet N určuje počet číslic. Řada musí být souvislá, bez mezer.</p>
+      <div class="series"><div class="h">Typ dokladu</div><div class="h">Maska čísla</div><div class="h">Další pořadí</div><div class="h">Další doklad dostane</div>
+      ${Object.entries(KIND).map(([k, v]) => `<div>${v[1]}</div><input type="text" data-sp="${k}" value="${esc(s.series[k].pattern)}" aria-label="Maska – ${v[1]}"><input type="number" min="1" data-sn="${k}" value="${s.series[k].next}" aria-label="Další pořadí – ${v[1]}"><code data-prev="${k}">${esc(S.next_numbers[k])}</code>`).join("")}</div>
+      <div class="grid" style="margin-top:20px;align-items:end">
+        <label class="f s3"><span>Zahájit číslování pro rok</span><input type="number" id="newYear" min="2000" max="2200" value="${Math.max(s.year + 1, +S.today.slice(0, 4))}"></label>
+        <div class="f s8"><div><button class="btn" id="startYear" type="button">Zahájit nový rok</button></div></div>
+      </div>
+      <p class="hint" style="margin:10px 0 0">Nový rok nastaví všechny řady znovu od čísla 1. Doklady z minulých let zůstávají v knize.</p>
+    </div>
+    <div class="panel"><h2>Záloha dat</h2><p class="hint">Všechna data jsou v jednom souboru v tomto zařízení. Zálohu si stahujte pravidelně – doklady je nutné archivovat 10 let.</p>
+      <div class="actions"><a class="btn" href="/api/backup">Stáhnout zálohu</a><label class="btn">Obnovit ze zálohy<input type="file" accept="application/json,.json" id="restore" hidden></label></div></div>`;
+  const pv = () => $$("[data-sp]").forEach(i => {
+    const k = i.dataset.sp, n = +$(`[data-sn="${k}"]`).value || 1;
+    $(`[data-prev="${k}"]`).textContent = i.value.replace(/\{(RRRR|RR|N+)\}/g, (m, t) => t === "RRRR" ? s.year : t === "RR" ? String(s.year).slice(2) : String(n).padStart(t.length, "0"));
+  });
+  $$("[data-sp],[data-sn]").forEach(i => i.oninput = pv);
+  const collect = () => {
+    $$("[data-co]").forEach(i => c[i.dataset.co] = i.value.trim());
+    c.vat_payer = $("#vatPayer").checked;
+    s.due_days = +$("#dueDays").value || 0; s.default_vat = +$("#defVat").value; s.default_payment = $("#defPay").value;
+    s.round_cash = $("#roundCash").checked; s.show_qr = $("#showQr").checked; s.footer_note = $("#footNote").value.trim();
+    $$("[data-sp]").forEach(i => s.series[i.dataset.sp].pattern = i.value.trim());
+    $$("[data-sn]").forEach(i => s.series[i.dataset.sn].next = +i.value || 1);
+    return s;
+  };
+  const saveS = async msg => { try { await api("PUT", "/api/settings", collect()); await reload(); viewSettings(); toast(msg || "Nastavení uloženo"); } catch (e) { fail(e); } };
+  $("#saveS").onclick = () => saveS();
+  $$("[data-img]").forEach(i => i.onchange = () => {
+    const f = i.files[0]; if (!f) return;
+    if (f.size > 4 * 1024 * 1024) return toast("Obrázek je větší než 4 MB. Zmenšete ho prosím.", true);
+    const r = new FileReader();
+    r.onload = () => { collect(); s[i.dataset.img] = r.result; saveS("Obrázek uložen"); };
+    r.readAsDataURL(f);
+  });
+  $$("[data-rmimg]").forEach(b => b.onclick = () => { collect(); s[b.dataset.rmimg] = ""; saveS("Obrázek odebrán"); });
+  $("#startYear").onclick = async () => {
+    const y = +$("#newYear").value;
+    if (!confirm(`Zahájit číslování pro rok ${y}? Všechny číselné řady začnou znovu od 1.`)) return;
+    try { await api("PUT", "/api/settings", collect()); await api("POST", "/api/year", { year: y }); await reload(); F.year = String(y); viewSettings(); toast(`Aktivní rok je ${y}`); } catch (e) { fail(e); }
+  };
+  $("#restore").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    if (!confirm("Obnovit data ze zálohy? Současná data budou nahrazena.")) return;
+    try { await api("POST", "/api/restore", JSON.parse(await f.text())); await reload(); viewSettings(); toast("Data obnovena ze zálohy"); } catch (er) { fail(er); }
+  };
+}
+
+document.addEventListener("click", e => { $$("details.more[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }); });
+window.addEventListener("hashchange", () => { window.scrollTo(0, 0); route(); });
+initTheme();
+reload().then(route).catch(e => { $("#main").innerHTML = `<div class="notice bad">Aplikaci se nepodařilo načíst: ${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>
