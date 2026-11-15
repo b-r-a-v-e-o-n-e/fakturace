@@ -1,0 +1,99 @@
+name: Sestavení
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Kontrola úplnosti repozitáře
+        run: |
+          for f in Cargo.toml Cargo.lock src/lib.rs assets/index.html android/settings.gradle android/app/build.gradle android/app/src/main/AndroidManifest.xml; do
+            [ -f "$f" ] || { echo "::error::V repozitáři chybí soubor $f – nahrajte celý obsah ZIPu včetně podsložek."; exit 1; }
+          done
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Instalace cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Sestavení nativní knihovny (Rust)
+        env:
+          # Android 15+ vyžaduje zarovnání nativních knihoven na 16 kB stránky.
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS: -C link-arg=-Wl,-z,max-page-size=16384
+          CARGO_TARGET_X86_64_LINUX_ANDROID_RUSTFLAGS: -C link-arg=-Wl,-z,max-page-size=16384
+        run: |
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          echo "NDK: $ANDROID_NDK_HOME"
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 \
+            -o android/app/src/main/jniLibs \
+            build --release --lib --features android
+          find android/app/src/main/jniLibs -name '*.so' -exec ls -la {} \;
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Podpisový klíč (volitelný)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "APK bude podepsáno vlastním klíčem."
+          else
+            echo "::warning::Chybí secret KEYSTORE_BASE64 – APK se podepíše dočasným ladicím klíčem. Aktualizace přes starší instalaci pak nepůjde bez odinstalování."
+          fi
+
+      - name: Sestavení APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: gradle -p android --no-daemon assembleRelease
+
+      - name: Přejmenování
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/*.apk out/fakturace-android.apk
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fakturace-android
+          path: out/fakturace-android.apk
+          if-no-files-found: error
+
+  linux:
+    name: Linux (statický program)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Sestavení
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: cargo build --release --bin fakturace --target x86_64-unknown-linux-gnu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fakturace-linux-x86_64
+          path: target/x86_64-unknown-linux-gnu/release/fakturace
+          if-no-files-found: error
